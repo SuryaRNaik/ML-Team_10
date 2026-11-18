@@ -1,0 +1,39 @@
+{
+  "model": "RandomForest",
+  "estimator": {
+    "n_estimators": 100,
+    "max_depth": 16,
+    "min_samples_leaf": 5,
+    "random_state": 42
+  },
+  "training": {
+    "trips": 80,
+    "observations_per_trip": 300,
+    "observations": 24000,
+    "candidate_rows": 362522,
+    "grouped_cross_validation_folds": 5,
+    "seed": 42
+  },
+  "evaluation": {
+    "partition": "student_test",
+    "usable_observations": 19131,
+    "classifier_only": {
+      "top1": 0.8736082797553708,
+      "continuity": 0.9284967046762214,
+      "route_f1": 0.878359944349287,
+      "route_precision": 0.8017850628030457,
+      "route_recall": 0.9772988294757188
+    },
+    "classifier_plus_hmm": {
+      "top1": 0.942135800533166,
+      "continuity": 0.9825818600271995,
+      "route_f1": 0.9743066468082642,
+      "route_precision": 0.9551629056458836,
+      "route_recall": 0.9945977249711904
+    }
+  },
+  "data_policy": {
+    "raw_and_processed_data_committed": false,
+    "test_labels_used_for_training_or_tuning": false
+  }
+}

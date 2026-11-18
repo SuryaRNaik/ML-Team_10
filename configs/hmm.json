@@ -1,9 +1,9 @@
 {
-  "alpha": 1.0,
-  "beta_m": 30.0,
-  "log_disc": -12.0,
-  "uturn_pen": 3.0,
-  "gap_break_s": 30.0,
+  "alpha": 0.5798332898894308,
+  "beta_m": 5.900917065019388,
+  "log_disc": -15.312523560078986,
+  "uturn_pen": 9.92375564055837,
+  "gap_break_s": 60.0,
   "p_floor": 1e-06,
   "max_hops": 6,
   "max_route_m": 600.0

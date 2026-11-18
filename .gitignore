@@ -1,5 +1,6 @@
 data/raw/
 data/processed/
+clean_dataset/
 __pycache__/
 *.pyc
 models/RandomForest.joblib

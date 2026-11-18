@@ -34,3 +34,22 @@ python scripts/04_hmm_decode.py --model HistGradientBoosting --tune          # t
 ```
 Outputs: `reports/hmm_comparison.csv`, `hmm_per_trip.csv`, `hmm_tuning.csv`, `figures/07_hmm_vs_classifier.png`, `maps/hmm_*.html`.
 The API calls `build_lattice` / `decode_hmm` from `hmm.py` with `prepare_trip(..., with_labels=False)` output.
+
+## Final trained model
+
+The final validated model is `models/RandomForest.joblib` combined with the tuned
+HMM/Viterbi decoder in `configs/hmm.json`. It was trained on 80 trips using
+300 usable observations per trip and evaluated on 19,131 usable observations
+from 10 held-out student-test trips.
+
+| Metric | Random Forest | Random Forest + HMM |
+|---|---:|---:|
+| Top-1 accuracy | 87.36% | **94.21%** |
+| Route continuity | 92.85% | **98.26%** |
+| Route F1 | 87.84% | **97.43%** |
+| Route precision | 80.18% | **95.52%** |
+| Route recall | 97.73% | **99.46%** |
+
+The complete final metrics are in `reports/hmm_comparison.csv`,
+`reports/hmm_per_trip.csv`, and `reports/final_training_summary.json`.
+Raw and processed datasets are intentionally excluded from version control.
