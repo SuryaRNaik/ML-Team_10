@@ -40,3 +40,24 @@ tr:hover td{background:#f8faff}
 .bar b{min-width:60px;font-variant-numeric:tabular-nums}
 pre{font:12.5px ui-monospace,Consolas,monospace;color:#334155;line-height:1.6}
 button:disabled{opacity:.6;cursor:wait}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;display:flex;flex-direction:column;height:100vh}
+header{display:flex;align-items:center;gap:18px;flex:none}
+#apistate{margin-left:auto}
+section{flex:1;min-height:0}
+section[hidden]{display:none!important}
+#tab-map{display:flex}
+#side{width:320px;flex:none;overflow:auto}
+#map{flex:1;min-width:0;height:100%}
+.pad{overflow:auto}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row select,.row input[type=text]{width:auto;min-width:260px}
+#side button.b,#side select,#side input[type=range]{width:100%}
+#side label{display:block}
+#side label:has(input[type=checkbox]){text-transform:none;font-size:13px;letter-spacing:0;color:var(--ink);font-weight:500}
+.bar{display:flex;align-items:center;gap:10px}
+.bar>div{position:relative;flex:1}
+.bar i{display:block;height:100%}
+.bar u{position:absolute}
+button:disabled{opacity:.55;cursor:not-allowed}
