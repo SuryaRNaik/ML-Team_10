@@ -1,0 +1,11 @@
+numpy
+pandas
+scipy
+shapely>=2.1
+pyproj
+pyarrow
+folium
+matplotlib
+scikit-learn
+joblib
+tqdm

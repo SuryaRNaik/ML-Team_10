@@ -1,0 +1,12 @@
+{
+  "candidate_radius_m": 100.0,
+  "max_candidates_per_point": 20,
+  "heading_half_window": 3,
+  "context_offset": 5,
+  "gap_threshold_s": 5.0,
+  "min_move_for_heading_m": 2.0,
+  "label_max_dist_m": 50.0,
+  "align_dist_cap_m": 200.0,
+  "align_max_skip": 3,
+  "align_skip_penalty_m": 20.0
+}

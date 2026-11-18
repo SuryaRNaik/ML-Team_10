@@ -1,0 +1,60 @@
+{
+  "seed": 42,
+  "features": [
+    "dist",
+    "dist_rel",
+    "dist_prev",
+    "dist_next",
+    "dist_ctx_mean",
+    "t_frac",
+    "along_m",
+    "dist_to_end_m",
+    "arc_len",
+    "cos_ang",
+    "abs_cos_ang",
+    "rank",
+    "n_cands",
+    "speed",
+    "heading_valid",
+    "gap_flag",
+    "out_deg_to",
+    "in_deg_from",
+    "has_reverse"
+  ],
+  "folds": 5,
+  "obs_per_trip": 150,
+  "n_train_obs": 12000,
+  "n_train_rows": 181762,
+  "n_test_obs": 19131,
+  "python": "3.13.18",
+  "models": {
+    "LogisticRegression": {
+      "family": "Linear",
+      "config": "C=1, class_weight=balanced, scaled"
+    },
+    "GaussianNB": {
+      "family": "Probabilistic",
+      "config": "var_smoothing=1e-9, scaled"
+    },
+    "DecisionTree": {
+      "family": "Tree",
+      "config": "max_depth=12, min_samples_leaf=20"
+    },
+    "RandomForest": {
+      "family": "Bagging ensemble",
+      "config": "100 trees, max_depth=16, min_samples_leaf=5"
+    },
+    "ExtraTrees": {
+      "family": "Randomised ensemble",
+      "config": "100 trees, max_depth=18, min_samples_leaf=5"
+    },
+    "HistGradientBoosting": {
+      "family": "Boosting",
+      "config": "lr=0.1, max_iter=200, max_leaf_nodes=31"
+    },
+    "MLP": {
+      "family": "Neural network",
+      "config": "(64,32) ReLU, adam, early_stopping, scaled"
+    }
+  }
+}
