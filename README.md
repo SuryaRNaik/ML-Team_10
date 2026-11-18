@@ -68,3 +68,13 @@ Start Laptop 1 with `python scripts/serve_api.py`, then start Laptop 2 with
 enter Laptop 1's reachable address in the Connection tab, load the ten trips,
 and run a prediction. The API calculates evaluation metrics server-side;
 reference routes are never sent to the UI.
+
+## Accuracy upgrade (relative features + Bayesian optimisation)
+```bash
+python scripts/05_error_analysis.py                       # which errors (reverse / adjacent / junction) remain?
+python scripts/06_bayes_opt.py --trials 40 --obs-per-trip 400   # Optuna TPE on HistGradientBoosting + src/pathsnap/features2.py features
+python scripts/04_hmm_decode.py --model-path models/HistGradientBoosting_tuned.joblib --tune   # decoder on the tuned model
+python scripts/05_error_analysis.py --model-path models/HistGradientBoosting_tuned.joblib
+```
+`models/HistGradientBoosting_tuned.joblib` is a dict {model, features, group_features, params}; the API must call
+`add_group_features(cands)` before `predict_proba` when `group_features` is true.

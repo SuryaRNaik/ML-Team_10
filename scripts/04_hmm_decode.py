@@ -30,6 +30,7 @@ from pathsnap.data_io import load_trip                                          
 from pathsnap.hmm import (HMMParams, RoadGraph, arc_lengths, build_lattice, viterbi,      # noqa: E402
                           decode_hmm, classifier_only, reconstruct_route, evaluate)
 from pathsnap.viz import trip_map                                                         # noqa: E402
+from pathsnap.features2 import add_group_features                                         # noqa: E402
 
 PROC, REP, MOD, RAW, CFG = ROOT / "data/processed", ROOT / "reports", ROOT / "models", ROOT / "data/raw", ROOT / "configs/hmm.json"
 SEED = 42
@@ -38,6 +39,14 @@ SEED = 42
 def features():
     f = REP / "experiment_log.json"
     return json.loads(f.read_text(encoding="utf-8"))["features"]
+
+
+def load_model(path):
+    """plain sklearn model (03) or bundle dict {model, features, group_features, params} saved by 06_bayes_opt.py"""
+    obj = joblib.load(path)
+    if isinstance(obj, dict):
+        return obj["model"], obj["features"], bool(obj.get("group_features", False)), obj.get("params")
+    return obj, features(), False, None
 
 
 def load_part(part):
@@ -65,14 +74,20 @@ def tune(args):
     from sklearn.model_selection import GroupKFold
     spec = importlib.util.spec_from_file_location("train_compare", ROOT / "scripts/03_train_compare.py")
     tc = importlib.util.module_from_spec(spec); spec.loader.exec_module(tc)
-    FEATS = tc.FEATURES
+    model0, FEATS, grp, bparams = load_model(args.model_path or MOD / f"{args.model}.joblib")
     pts, cands = load_part("train")
+    if grp:
+        cands = add_group_features(cands)
     ok = cands[cands.label_ok == 1]
     tr, _ = tc.sample_observations(ok, pts, args.obs_per_trip, SEED)
     trips = np.array(sorted(pts.trip_id.unique()))
     rng = np.random.default_rng(SEED)
     tune_trips = set(rng.choice(trips, size=min(args.tune_trips, len(trips)), replace=False))
-    est = tc.model_zoo()[args.model][2]
+    if bparams is not None:
+        from sklearn.ensemble import HistGradientBoostingClassifier
+        est = HistGradientBoostingClassifier(random_state=SEED, **bparams)
+    else:
+        est = tc.model_zoo()[args.model][2]
     folds = list(GroupKFold(n_splits=5).split(tr, tr.label, tr.trip_id))
     trip_fold = {}
     for k, (_, va) in enumerate(folds):
@@ -135,9 +150,10 @@ def tune(args):
 def evaluate_partition(args, prm):
     part = args.partition
     pts, cands = load_part(part)
-    model = joblib.load(args.model_path or MOD / f"{args.model}.joblib")
+    model, FEATS, grp, _ = load_model(args.model_path or MOD / f"{args.model}.joblib")
     name = Path(args.model_path).stem if args.model_path else args.model
-    FEATS = features()
+    if grp:
+        cands = add_group_features(cands)
     t0 = time.time()
     cands = cands.assign(p=model.predict_proba(cands[FEATS].to_numpy(np.float32))[:, 1])
     t_model = time.time() - t0
