@@ -1,0 +1,64 @@
+<!doctype html><html><head><meta charset="utf-8"><title>PathSnap</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;color:#222}
+header{display:flex;align-items:center;gap:18px;padding:0 16px;height:46px;background:#1f2937;color:#fff}
+nav button{background:none;border:0;color:#cbd5e1;padding:14px 10px;cursor:pointer;font-size:14px}nav button.on{color:#fff;border-bottom:2px solid #60a5fa}
+#apistate{margin-left:auto;font-size:12px;color:#9ca3af}
+section{flex:1;min-height:0}section[hidden]{display:none}
+#tab-map{display:flex}#side{width:300px;padding:14px;overflow:auto;background:#f6f7f9;border-right:1px solid #ddd}#map{flex:1}
+.pad{padding:18px;overflow:auto}h3{margin:0 0 8px}label{display:block;font-size:12px;margin-top:10px;color:#444}
+button.b{margin-top:10px;padding:7px 10px;cursor:pointer;width:100%}input[type=file],input[type=range],select,input[type=text]{width:100%;font-size:12px}
+#stats,#pinfo{margin-top:10px;font-size:13px;line-height:1.6}#msg{color:#b00;font-size:12px;margin-top:8px}
+.sw{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+table{border-collapse:collapse;font-size:12px;margin:10px 0}th,td{border:1px solid #ddd;padding:4px 8px;text-align:right}th{background:#f1f5f9}td:nth-child(1),td:nth-child(2){text-align:left}
+.bar{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:12px}.bar span{width:190px;text-align:right}.bar>div{position:relative;flex:1;max-width:520px;background:#eee;height:16px}
+.bar i{display:block;height:100%;background:#2166ac}.bar u{position:absolute;top:-2px;bottom:-2px;width:2px;background:#d62728}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.row select{width:auto}.muted{color:#666;font-size:12px}pre{background:#f1f5f9;padding:10px;font-size:12px;overflow:auto}
+</style><link rel="stylesheet" href="style.css"></head><body>
+<header><b>PathSnap</b><nav>
+<button data-tab="map" class="on">Route map</button><button data-tab="models">Models</button>
+<button data-tab="decode">Decoding</button><button data-tab="api">Connection</button></nav><span id="apistate">backend: not set</span></header>
+
+<section id="tab-map"><div id="side">
+<button class="b" id="demo">Load demo trip</button>
+<label>GPS track (.track)</label><input type="file" id="f_track">
+<label>Nodes (.nodes)</label><input type="file" id="f_nodes">
+<label>Arcs (.arcs)</label><input type="file" id="f_arcs">
+<button class="b" id="run">Run prediction (backend)</button>
+<button class="b" id="dl">Download predictions (CSV)</button>
+<label>Or predictions CSV (pt_idx,arc_id[,prob])</label><input type="file" id="f_pred">
+<label>Reference .route (display only, never sent to backend)</label><input type="file" id="f_ref">
+<label><input type="checkbox" id="t_net" checked> Road network <span class="sw" style="background:#aaa"></span></label>
+<label><input type="checkbox" id="t_gps" checked> GPS points <span class="sw" style="background:#1f77b4"></span></label>
+<label><input type="checkbox" id="t_route" checked> Predicted route <span class="sw" style="background:#d62728"></span></label>
+<label><input type="checkbox" id="t_ref" checked> Reference route <span class="sw" style="background:#2ca02c"></span></label>
+<label><input type="checkbox" id="t_conf"> Colour GPS by confidence <span class="sw" style="background:linear-gradient(90deg,#c00,#0a0)"></span></label>
+<label>Step through points</label><input type="range" id="scrub" min="0" max="0" value="0"><div id="pinfo"></div>
+<div id="stats"></div><div id="msg"></div></div><div id="map"></div></section>
+
+<section id="tab-models" class="pad" hidden><h3>Model comparison</h3>
+<div class="row"><select id="metric">
+<option value="test_top1">test_top1 (observation-level top-1)</option><option value="cv_top1_mean">cv_top1_mean</option>
+<option value="test_macro_f1">test_macro_f1 (candidate-level)</option><option value="route_continuity">route_continuity</option>
+<option value="test_log_loss">test_log_loss (lower better)</option><option value="train_time_s">train_time_s</option></select>
+<label style="margin:0">Add results CSV <input type="file" id="f_models"></label><button id="reset">Reset to baseline</button></div>
+<p class="muted">Red line = 90% top-1 target. Top-1 is per GPS observation; macro-F1 is per candidate row, so don't compare them.</p>
+<div id="mbars"></div><div id="mtable" style="overflow:auto"></div></section>
+
+<section id="tab-decode" class="pad" hidden><h3>Independent ML vs sequence decoding</h3>
+<div class="row"><label style="margin:0">Load comparison CSV/JSON (e.g. columns method,top1,route_continuity) <input type="file" id="f_dec"></label>
+<select id="dmetric"></select></div><div id="dbars"></div><div id="dtable"></div></section>
+
+<section id="tab-api" class="pad" hidden><h3>Backend connection</h3>
+<div class="row"><input type="text" id="api_url" placeholder="http://localhost:8000" style="width:320px">
+<button id="api_save">Save &amp; test</button><button id="api_metrics">Load metrics from backend</button></div><p id="api_out" class="muted"></p>
+<pre>GET  /health   -> {"status":"ok","model":"HistGradientBoosting"}
+POST /predict  multipart: track, nodes, arcs (no .route)
+               -> {"trip_id":"..","predictions":[{"pt_idx":0,"arc_id":12,"prob":0.91}, ...]}
+GET  /metrics  -> [{"model":"..","test_top1":0.9,...}]   (optional)
+The backend must allow CORS. Everything backend-related lives in api.js.</pre></section>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="config.js"></script><script src="api.js"></script><script src="data.js"></script><script src="app.js"></script>
+</body></html>
