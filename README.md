@@ -1,70 +1,103 @@
-# PathSnap – preprocessing stage
+# PathSnap — Distributed Map-Matching & Route Reconstruction
 
-## Run (≈20 s total)
-```bash
-pip install -r requirements.txt
-# put the raw folders at data/raw/train and data/raw/student_test
-python scripts/02_preprocess.py     # -> data/processed/{points,candidates}_<partition>.parquet + trip_summary_*.csv
-python scripts/01_eda.py            # -> reports/ (inventory csv, figures, folium maps, data_quality_log.md)
-```
+PathSnap reconstructs a realistic vehicle route by matching noisy GPS observations to candidate road segments and decoding a connected sequence with an HMM/Viterbi algorithm.
 
-## Layout
-- `src/pathsnap/data_io.py`  raw readers (.track/.nodes/.arcs/.route)
-- `src/pathsnap/geo.py`      per-trip UTM projection, point-to-segment distance
-- `src/pathsnap/prepare.py`  cleaning, candidate generation, route alignment (labels), features. `prepare_trip()` is reused by the API at inference time (call with `with_labels=False`)
-- `src/pathsnap/viz.py`      Folium map builder (GPS, network, reference route, predicted route)
-- `configs/preprocess.json`  radius, K, windows, thresholds
-- `reports/`                 inventory, figures, maps, data_quality_log.md
+## Repository layout
 
-## Output tables
-`candidates_*.parquet`: one row per (trip_id, pt_idx, arc_id). Target = `label`. Train/evaluate only on `label_ok == 1`.
-Group CV by `trip_id`. Features: dist, dist_rel, dist_prev, dist_next, dist_ctx_mean, t_frac, along_m, dist_to_end_m, arc_len,
-cos_ang, abs_cos_ang, rank, n_cands, speed, heading_valid, gap_flag, out_deg_to, in_deg_from, has_reverse.
-`points_*.parquet`: one row per GPS observation (x,y metres, kinematics, true_arc, label_ok, true_in_cands) – needed by the HMM/decoder metrics.
+- src/pathsnap/data_io.py — readers for .track, .nodes, .arcs and .route files.
+- src/pathsnap/geo.py — local projection and point-to-road geometry calculations.
+- src/pathsnap/prepare.py — cleaning, candidate generation, route-label alignment and feature engineering.
+- src/pathsnap/hmm.py — road graph, HMM lattice, Viterbi decoding and route metrics.
+- scripts/01_eda.py — exploratory data analysis and Folium maps.
+- scripts/02_preprocess.py — preprocessing for training and student-testing partitions.
+- scripts/03_train_compare.py — grouped cross-validation and model comparison.
+- scripts/04_hmm_decode.py — classifier-only versus HMM/Viterbi evaluation and decoder tuning.
+- scripts/serve_api.py — Laptop 1 FastAPI service for the two-laptop evaluation setup.
+- ui/ — Laptop 2 static evaluator UI.
 
-## HMM / Viterbi route reconstruction
-- `src/pathsnap/hmm.py`  hidden states = candidate arcs per GPS point; emission = alpha*log(classifier prob);
-  transition = -|route distance - GPS distance|/beta (connected arcs), constant penalty if disconnected, U-turn penalty;
-  chain restarts at GPS gaps; points with no candidates are filled from the nearest decoded arc.
-- `configs/hmm.json`    decoder parameters (overwritten by `--tune`)
-- `scripts/04_hmm_decode.py`
-```bash
-python scripts/04_hmm_decode.py --model HistGradientBoosting                 # classifier-only vs +HMM on student_test
-python scripts/04_hmm_decode.py --model HistGradientBoosting --tune          # tune decoder on TRAIN (out-of-fold) first
-```
-Outputs: `reports/hmm_comparison.csv`, `hmm_per_trip.csv`, `hmm_tuning.csv`, `figures/07_hmm_vs_classifier.png`, `maps/hmm_*.html`.
-The API calls `build_lattice` / `decode_hmm` from `hmm.py` with `prepare_trip(..., with_labels=False)` output.
+Raw and processed datasets are excluded from version control. Keep the evaluator reference routes on Laptop 1.
 
-## Final trained model
+## ML pipeline
 
-The final validated model is `models/RandomForest.joblib` combined with the tuned
-HMM/Viterbi decoder in `configs/hmm.json`. It was trained on 80 trips using
-300 usable observations per trip and evaluated on 19,131 usable observations
-from 10 held-out student-test trips.
+Install project dependencies:
 
-| Metric | Random Forest | Random Forest + HMM |
-|---|---:|---:|
-| Top-1 accuracy | 87.36% | **94.21%** |
-| Route continuity | 92.85% | **98.26%** |
-| Route F1 | 87.84% | **97.43%** |
-| Route precision | 80.18% | **95.52%** |
-| Route recall | 97.73% | **99.46%** |
+~~~~powershell
+python -m pip install -r requirements.txt
+~~~~
 
-The complete final metrics are in `reports/hmm_comparison.csv`,
-`reports/hmm_per_trip.csv`, and `reports/final_training_summary.json`.
-Raw and processed datasets are intentionally excluded from version control.
+Place the training and development partitions in the corresponding folders under data/raw/ (folder names can be overridden in the scripts):
 
-## Two-system deployment
+~~~~text
+data/raw/
+  train/
+    <trip-id>/<trip-id>.track, .nodes, .arcs, .route
+  student_test/
+    <trip-id>/<trip-id>.track, .nodes, .arcs, .route
+~~~~
 
-The deployment follows the required two-laptop architecture:
+Run preprocessing, EDA and model comparison:
 
-- **Laptop 1:** hosts `scripts/serve_api.py`, the trained model, HMM decoder,
-  road-network files and private reference routes.
-- **Laptop 2:** hosts the static `ui/` evaluator interface and sends only a
-  selected `trip_id` to Laptop 1.
+~~~~powershell
+python scripts/02_preprocess.py
+python scripts/01_eda.py
+python scripts/03_train_compare.py
+~~~~
 
-Start Laptop 1 with `python scripts/serve_api.py`, then start Laptop 2 with
-`python -m http.server 8080 --directory ui`. Open `http://localhost:8080`,
-enter Laptop 1's reachable address in the Connection tab, load the ten trips,
-and run a prediction. The API calculates evaluation metrics server-side;
-reference routes are never sent to the UI.
+The model comparison uses trip-grouped cross-validation on the 80 training trips and development evaluation on the 10 student-testing trips. The 10 evaluator-testing trips must not be used for training, feature selection, model selection or hyperparameter tuning.
+
+The validated end-to-end candidate in the current experiment is RandomForest with the tuned HMM/Viterbi decoder. The reported development result is 94.21% Top-1 accuracy on the 10 student-testing trips; it is not an evaluator-test result. See reports/hmm_comparison.csv and reports/final_training_summary.json for the recorded results.
+
+## Two-laptop deployment
+
+The hackathon guide specifies this division:
+
+- **Laptop 1 — Model and API:** owns the trained model, HMM/Viterbi decoder, road-network data, evaluator trips and server-side evaluation process.
+- **Laptop 2 — User Interface:** displays the ten evaluator-trip options, sends only the selected trip ID to Laptop 1, and displays the returned predicted route and scores.
+
+### Laptop 1: start the FastAPI backend
+
+Make sure the evaluator partition is present on Laptop 1. By default, the backend expects it at data/raw/evaluator_test, with each trip in its own folder and all four files present. If the provided dataset uses a different folder name, set the environment variable to the exact directory containing the ten evaluator trip folders.
+
+~~~~powershell
+# Use the actual evaluator partition folder provided with the dataset.
+$env:PATHSNAP_EVALUATOR_DIR = "data/raw/evaluator_test"
+$env:PATHSNAP_MODEL = "RandomForest"
+python scripts/serve_api.py
+~~~~
+
+The service listens on 0.0.0.0:8000, so another laptop on the same network can reach it. Find Laptop 1's IPv4 address with ipconfig. Allow inbound TCP port 8000 through Windows Firewall on the private network when prompted or when required by your setup.
+
+Verify on Laptop 1:
+
+- http://127.0.0.1:8000/health
+- http://127.0.0.1:8000/docs
+
+### Laptop 2: start the evaluator UI
+
+From the repository folder:
+
+~~~~powershell
+python -m http.server 8080 --directory ui
+~~~~
+
+Open http://localhost:8080. In the **Connection** tab, enter Laptop 1's address, for example http://192.168.1.20:8000, then select **Save and test**. Load the evaluator trips, select one and run HMM prediction.
+
+### API contract
+
+- GET /health — confirms that the configured model and evaluator data directory are available.
+- GET /trips — returns evaluator trip IDs and GPS point counts only.
+- POST /predict — accepts JSON { "trip_id": "<trip-id>" } and returns GPS points, predicted route geometry, classifier/HMM scores and data-quality metadata.
+- GET /metrics — returns the saved development HMM comparison from reports/hmm_comparison.csv.
+
+The prediction pass calls prepare_trip(..., with_labels=False). Only after predictions are created does Laptop 1 separately read the evaluator .route file and calculate server-side metrics. The reference route and true arc labels are never included in the API response or sent to Laptop 2.
+
+## Backend contract tests
+
+Install the test dependencies and run:
+
+~~~~powershell
+python -m pip install pytest httpx
+python -m pytest -q tests/test_serve_api.py
+~~~~
+
+The tests use a synthetic trip and mocked model/decoder functions to check API readiness, evaluator-trip listing, prediction response shape, server-side scoring and path-traversal rejection. They do not replace a live integration test using the actual evaluator dataset on both laptops.
