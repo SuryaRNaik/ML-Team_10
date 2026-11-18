@@ -23,7 +23,7 @@
     <h3>Evaluation trips</h3>
     <p class="muted">Trips and ground truth remain on Laptop 1.</p>
     <button class="b" id="load_trips">Load trips from backend</button>
-    <label>Student-test trip</label>
+    <label>Evaluator trip</label>
     <select id="trip_select" disabled><option>Select a backend first</option></select>
     <button class="b" id="run" disabled>Run HMM prediction</button>
     <label><input type="checkbox" id="t_gps" checked> GPS observations</label>
@@ -66,7 +66,7 @@
     <button id="api_refresh">Load trips</button>
   </div>
   <p id="api_out" class="muted"></p>
-  <pre>Laptop 1: python scripts\serve_api.py
+  <pre>Laptop 1: python scripts/serve_api.py
 Laptop 2: python -m http.server 8080 --directory ui
 API: GET /health, GET /trips, POST /predict { "trip_id": "..." }
 The UI never uploads or receives .route ground truth.</pre>
