@@ -10,4 +10,5 @@ scikit-learn
 joblib
 tqdm
 
-flask
+fastapi
+uvicorn

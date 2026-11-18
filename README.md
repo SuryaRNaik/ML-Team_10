@@ -53,3 +53,18 @@ from 10 held-out student-test trips.
 The complete final metrics are in `reports/hmm_comparison.csv`,
 `reports/hmm_per_trip.csv`, and `reports/final_training_summary.json`.
 Raw and processed datasets are intentionally excluded from version control.
+
+## Two-system deployment
+
+The deployment follows the required two-laptop architecture:
+
+- **Laptop 1:** hosts `scripts/serve_api.py`, the trained model, HMM decoder,
+  road-network files and private reference routes.
+- **Laptop 2:** hosts the static `ui/` evaluator interface and sends only a
+  selected `trip_id` to Laptop 1.
+
+Start Laptop 1 with `python scripts/serve_api.py`, then start Laptop 2 with
+`python -m http.server 8080 --directory ui`. Open `http://localhost:8080`,
+enter Laptop 1's reachable address in the Connection tab, load the ten trips,
+and run a prediction. The API calculates evaluation metrics server-side;
+reference routes are never sent to the UI.

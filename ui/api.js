@@ -1,12 +1,27 @@
-// The ONLY file that talks to the backend. Backend contract (enable CORS on it):
-//  GET  /health   -> {"status":"ok","model":"..."}
-//  POST /predict  multipart: track, nodes, arcs (raw files, NO .route) -> {"trip_id":"..","predictions":[{"pt_idx":0,"arc_id":12,"prob":0.9},...]}
-//  GET  /metrics  -> [ {model, test_top1, test_macro_f1, ...}, ... ]   (optional, same columns as model_comparison.csv)
-const need = () => { if (!CONFIG.API_URL) throw new Error("No backend set. Use the Connection tab."); };
-async function apiHealth() { need(); const r = await fetch(CONFIG.API_URL + "/health"); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }
-async function apiMetrics() { need(); const r = await fetch(CONFIG.API_URL + "/metrics"); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }
-async function predictTrip(f) {
-  need(); const fd = new FormData(); fd.append("track", f.track); fd.append("nodes", f.nodes); fd.append("arcs", f.arcs);
-  const r = await fetch(CONFIG.API_URL + "/predict", { method: "POST", body: fd });
-  if (!r.ok) throw new Error("Backend error " + r.status); return (await r.json()).predictions;
+// Laptop 2 talks to Laptop 1 only through this file.
+const needApi = () => {
+  const url = CONFIG.API_URL.trim().replace(/\/$/, "");
+  if (!url) throw new Error("Set the Laptop 1 API URL in the Connection tab.");
+  return url;
+};
+
+async function request(path, options = {}) {
+  const response = await fetch(needApi() + path, options);
+  if (!response.ok) {
+    let detail = `HTTP ${response.status}`;
+    try { detail = (await response.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return response.json();
+}
+
+async function apiHealth() { return request("/health"); }
+async function apiTrips() { return request("/trips"); }
+async function apiMetrics() { return request("/metrics"); }
+async function apiPredict(tripId) {
+  return request("/predict", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({trip_id: tripId}),
+  });
 }
